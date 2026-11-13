@@ -1,0 +1,381 @@
+openapi: 3.0.3
+info:
+  title: Yanki Service API
+  description: |
+    Monedero móvil Yanki: no hace falta ser cliente del banco. Se envían y reciben pagos con solo
+    el número de celular. Si el monedero tiene asociada una tarjeta de débito, los pagos se cargan
+    y abonan en la cuenta principal de la tarjeta.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8087
+    description: Local
+tags:
+  - name: Wallets
+    description: Monederos Yanki
+  - name: Payments
+    description: Pagos entre monederos
+  - name: DebitCardLinks
+    description: Asociación de una tarjeta de débito del banco con un monedero
+paths:
+  /api/v1/yanki/wallets:
+    post:
+      tags: [Wallets]
+      operationId: createWallet
+      summary: Crear un monedero
+      description: |
+        Público: no hace falta ser cliente del banco. Hay un solo monedero por celular.
+        El documento es DNI (8 dígitos), CEX o PASSPORT (hasta 12 letras o dígitos); el celular
+        tiene 9 dígitos y empieza con 9; el IMEI tiene 15 dígitos con dígito de control (Luhn).
+        El monedero empieza con saldo 0. Después se registra el acceso en
+        /api/v1/auth/wallet-users con el celular y una contraseña.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WalletRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/WalletResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/BusinessRuleViolation'
+  /api/v1/yanki/wallet:
+    get:
+      tags: [Wallets]
+      operationId: getWallet
+      summary: Consultar el monedero propio
+      parameters:
+        - $ref: '#/components/parameters/XWalletId'
+      responses:
+        '200':
+          $ref: '#/components/responses/WalletResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/yanki/payments:
+    post:
+      tags: [Payments]
+      operationId: sendPayment
+      summary: Enviar un pago a otro celular
+      description: |
+        Cada lado usa el saldo de su monedero o, si tiene tarjeta de débito, la cuenta principal
+        de la tarjeta.
+        - Monedero a monedero: se completa en el momento (201, COMPLETED); el saldo debe alcanzar.
+        - Si interviene una cuenta, el pago queda pendiente (202, PENDING) hasta que
+          transaction-service responda. El cargo a una cuenta sigue las reglas y comisiones de un
+          retiro; el abono, las de un depósito. Si algo se rechaza, lo descontado se devuelve y el
+          pago queda REJECTED con su motivo.
+      parameters:
+        - $ref: '#/components/parameters/XWalletId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/PaymentResult'
+        '202':
+          $ref: '#/components/responses/PaymentResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/BusinessRuleViolation'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    get:
+      tags: [Payments]
+      operationId: listPayments
+      summary: Listar los pagos enviados y recibidos
+      parameters:
+        - $ref: '#/components/parameters/XWalletId'
+      responses:
+        '200':
+          description: Pagos del monedero, del más reciente al más antiguo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/v1/yanki/payments/{paymentId}:
+    get:
+      tags: [Payments]
+      operationId: getPayment
+      summary: Consultar un pago enviado o recibido
+      parameters:
+        - $ref: '#/components/parameters/XWalletId'
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/PaymentResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/yanki/debit-card-links:
+    post:
+      tags: [DebitCardLinks]
+      operationId: authorizeDebitCardLink
+      summary: Autorizar una tarjeta de débito propia para un monedero
+      description: |
+        Lo hace el cliente del banco dueño de la tarjeta (token de cliente). Luego el dueño del
+        monedero debe confirmarla. Una tarjeta se asocia a un solo monedero y un monedero tiene
+        una sola tarjeta.
+      parameters:
+        - $ref: '#/components/parameters/XCustomerId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DebitCardLinkRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/DebitCardLinkResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/BusinessRuleViolation'
+    get:
+      tags: [DebitCardLinks]
+      operationId: listDebitCardLinks
+      summary: Listar las asociaciones dirigidas al monedero
+      parameters:
+        - $ref: '#/components/parameters/XWalletId'
+      responses:
+        '200':
+          description: Asociaciones del monedero
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DebitCardLinkResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/v1/yanki/debit-card-links/{linkId}/confirm:
+    post:
+      tags: [DebitCardLinks]
+      operationId: confirmDebitCardLink
+      summary: Confirmar la asociación de una tarjeta
+      description: |
+        El saldo del monedero se transfiere a la cuenta principal de la tarjeta (como un
+        depósito). Con saldo 0 la tarjeta queda asociada en el momento (200, ACTIVE); si hay
+        saldo, la asociación queda TRANSFERRING (202) hasta que la cuenta lo acepte (ACTIVE) o
+        lo rechace (REJECTED, el saldo vuelve al monedero).
+      parameters:
+        - $ref: '#/components/parameters/XWalletId'
+        - name: linkId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/DebitCardLinkResult'
+        '202':
+          $ref: '#/components/responses/DebitCardLinkResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/BusinessRuleViolation'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+components:
+  parameters:
+    XWalletId:
+      name: X-Wallet-Id
+      in: header
+      required: true
+      description: Id del monedero que realiza la operación. Lo establece el API Gateway con el claim sub del JWT de monedero; el valor que envía el cliente se descarta
+      schema:
+        type: string
+    XCustomerId:
+      name: X-Customer-Id
+      in: header
+      required: true
+      description: Id del cliente que realiza la operación. Lo establece el API Gateway con el claim sub del JWT de cliente; el valor que envía el cliente se descarta
+      schema:
+        type: string
+  schemas:
+    WalletRequest:
+      type: object
+      required: [documentType, documentNumber, phone, imei, email]
+      properties:
+        documentType:
+          type: string
+          enum: [DNI, CEX, PASSPORT]
+        documentNumber:
+          type: string
+          example: '45678912'
+        phone:
+          type: string
+          example: '987654321'
+        imei:
+          type: string
+          example: '490154203237518'
+        email:
+          type: string
+          example: ana@mail.com
+    WalletResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        documentType:
+          type: string
+          enum: [DNI, CEX, PASSPORT]
+        documentNumber:
+          type: string
+        phone:
+          type: string
+        imei:
+          type: string
+        email:
+          type: string
+        balance:
+          type: number
+          description: Saldo propio; 0 si tiene tarjeta (los pagos usan la cuenta principal)
+        debitCardId:
+          type: string
+          description: Tarjeta de débito asociada (null si no tiene)
+        status:
+          type: string
+          enum: [ACTIVE, LINKING]
+        createdAt:
+          type: string
+          format: date
+    PaymentRequest:
+      type: object
+      required: [toPhone, amount]
+      properties:
+        toPhone:
+          type: string
+          example: '912345678'
+        amount:
+          type: number
+          example: 50.0
+    PaymentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        fromPhone:
+          type: string
+        toPhone:
+          type: string
+        amount:
+          type: number
+        date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [PENDING, COMPLETED, REJECTED]
+        rejectionReason:
+          type: string
+    DebitCardLinkRequest:
+      type: object
+      required: [phone, debitCardId]
+      properties:
+        phone:
+          type: string
+          example: '987654321'
+        debitCardId:
+          type: string
+    DebitCardLinkResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        debitCardId:
+          type: string
+        phone:
+          type: string
+        requestedAt:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [PENDING_CONFIRMATION, TRANSFERRING, ACTIVE, REJECTED]
+        transferredBalance:
+          type: number
+        rejectionReason:
+          type: string
+    Problem:
+      type: object
+      description: Detalle de error (RFC 7807)
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+  responses:
+    WalletResult:
+      description: Monedero
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/WalletResponse'
+    PaymentResult:
+      description: Pago (201 completado; 202 pendiente)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PaymentResponse'
+    DebitCardLinkResult:
+      description: Asociación de tarjeta
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/DebitCardLinkResponse'
+    BadRequest:
+      description: Datos de entrada inválidos o falta el header de identidad
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: El recurso no existe
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    BusinessRuleViolation:
+      description: Se incumple una regla de negocio (por ejemplo, saldo insuficiente o celular con monedero)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ServiceUnavailable:
+      description: No se pudo pedir la operación a la cuenta bancaria (Kafka no disponible); lo descontado se devolvió
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
