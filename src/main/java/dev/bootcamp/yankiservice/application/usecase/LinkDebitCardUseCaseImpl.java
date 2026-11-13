@@ -13,6 +13,7 @@ import dev.bootcamp.yankiservice.domain.model.link.LinkStatus;
 import dev.bootcamp.yankiservice.domain.model.operation.OperationId;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Single;
+import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -21,6 +22,7 @@ import java.time.LocalDate;
 /**
  * Implementación de {@link LinkDebitCardUseCase}.
  */
+@RequiredArgsConstructor
 public class LinkDebitCardUseCaseImpl implements LinkDebitCardUseCase {
     static final String CARD_ALREADY_LINKED =
             "La tarjeta de débito ya está asociada a un monedero";
@@ -30,22 +32,6 @@ public class LinkDebitCardUseCaseImpl implements LinkDebitCardUseCase {
     private final DebitCardLinkRepository linkRepository;
     private final AccountOperationPublisher operationPublisher;
     private final Clock clock;
-
-    /**
-     * Crea el caso de uso con sus puertos y el reloj que fija las fechas.
-     */
-    public LinkDebitCardUseCaseImpl(
-            DebitCardRepository debitCardRepository,
-            WalletRepository walletRepository,
-            DebitCardLinkRepository linkRepository,
-            AccountOperationPublisher operationPublisher,
-            Clock clock) {
-        this.debitCardRepository = debitCardRepository;
-        this.walletRepository = walletRepository;
-        this.linkRepository = linkRepository;
-        this.operationPublisher = operationPublisher;
-        this.clock = clock;
-    }
 
     @Override
     public Single<DebitCardLink> authorize(String customerId, String phone, String debitCardId) {

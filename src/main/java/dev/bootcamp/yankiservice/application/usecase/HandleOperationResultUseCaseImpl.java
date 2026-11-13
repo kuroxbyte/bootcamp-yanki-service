@@ -10,6 +10,7 @@ import dev.bootcamp.yankiservice.domain.model.operation.OperationId;
 import dev.bootcamp.yankiservice.domain.model.payment.PaymentStep;
 import dev.bootcamp.yankiservice.domain.model.payment.YankiPayment;
 import io.reactivex.rxjava3.core.Completable;
+import lombok.RequiredArgsConstructor;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -17,28 +18,13 @@ import java.time.LocalDate;
 /**
  * Implementación de {@link HandleOperationResultUseCase}.
  */
+@RequiredArgsConstructor
 public class HandleOperationResultUseCaseImpl implements HandleOperationResultUseCase {
     private final YankiPaymentRepository paymentRepository;
     private final DebitCardLinkRepository linkRepository;
     private final WalletRepository walletRepository;
     private final AccountOperationPublisher operationPublisher;
     private final Clock clock;
-
-    /**
-     * Crea el caso de uso con sus puertos y el reloj que fecha las devoluciones.
-     */
-    public HandleOperationResultUseCaseImpl(
-            YankiPaymentRepository paymentRepository,
-            DebitCardLinkRepository linkRepository,
-            WalletRepository walletRepository,
-            AccountOperationPublisher operationPublisher,
-            Clock clock) {
-        this.paymentRepository = paymentRepository;
-        this.linkRepository = linkRepository;
-        this.walletRepository = walletRepository;
-        this.operationPublisher = operationPublisher;
-        this.clock = clock;
-    }
 
     @Override
     public Completable execute(String operationId, boolean completed, String reason) {
