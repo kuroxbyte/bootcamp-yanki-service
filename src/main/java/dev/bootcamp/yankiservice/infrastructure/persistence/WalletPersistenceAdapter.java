@@ -10,36 +10,30 @@ import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Single;
 import lombok.RequiredArgsConstructor;
 import org.bson.types.Decimal128;
-import org.springframework.data.mongodb.core.FindAndModifyOptions;
-import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 import java.math.BigDecimal;
-
-import static org.springframework.data.mongodb.core.query.Criteria.where;
 
 /**
  * Implementa el puerto {@link WalletRepository} con MongoDB reactivo.
  *
- * <p>Las operaciones de saldo y de asociación son una sola actualización con condiciones
- * ({@code updateFirst} o {@code findAndModify}): dos pagos a la vez no dejan un saldo negativo. La
+ * <p>Las operaciones de saldo y de asociación son una sola actualización condicionada, derivada
+ * del nombre del método en {@link WalletMongoRepository}: dos pagos a la vez no dejan un saldo
+ * negativo. Al iniciar la asociación se lee el saldo y se actualiza solo si no cambió; si un pago
+ * se cruzó, se reintenta. La
  * búsqueda por celular usa {@link WalletPhoneCache} para resolver el id del monedero.
  */
 @Component
 @RequiredArgsConstructor
 public class WalletPersistenceAdapter implements WalletRepository {
 
-    private static final String ID = "_id";
-    private static final String BALANCE = "balance";
-    private static final String STATUS = "status";
-    private static final String DEBIT_CARD_ID = "debitCardId";
+    private static final String ACTIVE = WalletStatus.ACTIVE.name();
+    private static final Decimal128 ZERO = new Decimal128(BigDecimal.ZERO);
+    private static final int LINKING_RETRIES = 5;
 
     private final WalletMongoRepository mongoRepository;
-    private final ReactiveMongoTemplate mongoTemplate;
     private final WalletPhoneCache phoneCache;
 
     @Override
@@ -72,62 +66,62 @@ public class WalletPersistenceAdapter implements WalletRepository {
 
     @Override
     public Single<Boolean> debitBalance(String walletId, BigDecimal amount) {
-        Query query = Query.query(available(walletId)
-                .and(BALANCE).gte(new Decimal128(amount)));
-        Update update = new Update().inc(BALANCE, new Decimal128(amount.negate()));
-        return Single.fromPublisher(mongoTemplate.updateFirst(query, update, WalletDocument.class))
-                .map(result -> result.getModifiedCount() == 1);
+        Mono<Long> modified = mongoRepository
+                .findAndIncrementBalanceByIdAndStatusAndDebitCardIdIsNullAndBalanceGreaterThanEqual(
+                        walletId, ACTIVE, new Decimal128(amount), new Decimal128(amount.negate()));
+        return Single.fromPublisher(modified).map(count -> count == 1);
     }
 
     @Override
     public Completable creditBalance(String walletId, BigDecimal amount) {
-        Update update = new Update().inc(BALANCE, new Decimal128(amount));
-        return Completable.fromPublisher(mongoTemplate.updateFirst(
-                Query.query(where(ID).is(walletId)),
-                update,
-                WalletDocument.class));
+        return Completable.fromPublisher(
+                mongoRepository.findAndIncrementBalanceById(walletId, new Decimal128(amount)));
     }
 
     @Override
     public Maybe<BigDecimal> startLinking(String walletId) {
-        Update update = new Update()
-                .set(STATUS, WalletStatus.LINKING.name())
-                .set(BALANCE, new Decimal128(BigDecimal.ZERO));
-        return Maybe.fromPublisher(mongoTemplate.findAndModify(
-                        Query.query(available(walletId)),
-                        update,
-                        FindAndModifyOptions.options().returnNew(false),
-                        WalletDocument.class))
-                .map(WalletDocument::getBalance);
+        Mono<BigDecimal> attempt = mongoRepository.findById(walletId)
+                .filter(WalletPersistenceAdapter::isAvailable)
+                .flatMap(document -> mongoRepository
+                        .findAndStartLinkingByIdAndStatusAndDebitCardIdIsNullAndBalance(
+                                walletId, ACTIVE, new Decimal128(document.getBalance()), ZERO)
+                        .flatMap(modified -> modified == 1
+                                ? Mono.just(document.getBalance())
+                                : Mono.error(new ConcurrentBalanceChange())));
+        // Si un pago cambió el saldo entre la lectura y la actualización, se vuelve a leer.
+        return Maybe.fromPublisher(attempt.retryWhen(Retry.max(LINKING_RETRIES)
+                .filter(ConcurrentBalanceChange.class::isInstance)));
     }
 
     @Override
     public Completable finishLinking(String walletId, String debitCardId) {
-        Update update = new Update()
-                .set(DEBIT_CARD_ID, debitCardId)
-                .set(STATUS, WalletStatus.ACTIVE.name());
-        return Completable.fromPublisher(mongoTemplate.updateFirst(
-                Query.query(where(ID).is(walletId)),
-                update,
-                WalletDocument.class));
+        return Completable.fromPublisher(
+                mongoRepository.findAndSetDebitCardIdById(walletId, debitCardId));
     }
 
     @Override
     public Completable cancelLinking(String walletId, BigDecimal balance) {
-        Update update = new Update()
-                .set(STATUS, WalletStatus.ACTIVE.name())
-                .inc(BALANCE, new Decimal128(balance));
-        return Completable.fromPublisher(mongoTemplate.updateFirst(
-                Query.query(where(ID).is(walletId)),
-                update,
-                WalletDocument.class));
+        return Completable.fromPublisher(
+                mongoRepository.findAndRestoreBalanceById(walletId, new Decimal128(balance)));
     }
 
     // Monedero activo y sin tarjeta: el único que usa su propio saldo.
-    private static Criteria available(String walletId) {
-        return where(ID).is(walletId)
-                .and(STATUS).is(WalletStatus.ACTIVE.name())
-                .and(DEBIT_CARD_ID).is(null);
+    private static boolean isAvailable(WalletDocument document) {
+        return ACTIVE.equals(document.getStatus()) && document.getDebitCardId() == null;
+    }
+
+    /**
+     * Señala que el saldo cambió entre la lectura y la actualización al iniciar la asociación.
+     */
+    private static final class ConcurrentBalanceChange extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        /**
+         * Crea la señal sin traza: solo sirve para reintentar.
+         */
+        ConcurrentBalanceChange() {
+            super("El saldo del monedero cambió durante la asociación", null, false, false);
+        }
     }
 
     private static WalletDocument toDocument(Wallet wallet) {
