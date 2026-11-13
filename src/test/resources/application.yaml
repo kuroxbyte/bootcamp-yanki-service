@@ -1,0 +1,35 @@
+# Configuración de las pruebas: no se consulta config-server.
+spring:
+  application:
+    name: yanki-service
+  cloud:
+    config:
+      enabled: false
+  mongodb:
+    uri: mongodb://localhost:27017/yanki_test_db
+  kafka:
+    bootstrap-servers: localhost:9092
+    admin:
+      # Las pruebas no crean tópicos en un broker.
+      auto-create: false
+    listener:
+      # Las pruebas no se conectan a un broker; los consumidores se prueban directamente.
+      auto-startup: false
+
+eureka:
+  client:
+    # Las pruebas no se registran en Eureka.
+    enabled: false
+
+messaging:
+  topics:
+    yanki-events: yanki-events
+    yanki-operations: yanki-operations
+    yanki-operation-results: yanki-operation-results
+    debit-card-events: debit-card-events
+
+cache:
+  debit-cards:
+    ttl: 10m
+  wallet-phones:
+    ttl: 10m
