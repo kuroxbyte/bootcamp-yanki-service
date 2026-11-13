@@ -14,6 +14,7 @@ import dev.bootcamp.yankiservice.domain.model.wallet.WalletStatus;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Single;
+import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -22,6 +23,7 @@ import java.util.Optional;
 /**
  * Implementación de {@link SendPaymentUseCase}.
  */
+@RequiredArgsConstructor
 public class SendPaymentUseCaseImpl implements SendPaymentUseCase {
     static final String INSUFFICIENT_BALANCE = "Saldo insuficiente en el monedero";
     static final String UNAVAILABLE =
@@ -31,20 +33,6 @@ public class SendPaymentUseCaseImpl implements SendPaymentUseCase {
     private final YankiPaymentRepository paymentRepository;
     private final DebitCardRepository debitCardRepository;
     private final AccountOperationPublisher operationPublisher;
-
-    /**
-     * Crea el caso de uso con los adaptadores de sus puertos.
-     */
-    public SendPaymentUseCaseImpl(
-            WalletRepository walletRepository,
-            YankiPaymentRepository paymentRepository,
-            DebitCardRepository debitCardRepository,
-            AccountOperationPublisher operationPublisher) {
-        this.walletRepository = walletRepository;
-        this.paymentRepository = paymentRepository;
-        this.debitCardRepository = debitCardRepository;
-        this.operationPublisher = operationPublisher;
-    }
 
     @Override
     public Single<YankiPayment> execute(

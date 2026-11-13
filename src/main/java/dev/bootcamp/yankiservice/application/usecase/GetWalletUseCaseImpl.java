@@ -9,26 +9,16 @@ import dev.bootcamp.yankiservice.domain.model.payment.YankiPayment;
 import dev.bootcamp.yankiservice.domain.model.wallet.Wallet;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.Single;
+import lombok.RequiredArgsConstructor;
 
 /**
  * Implementación de {@link GetWalletUseCase}.
  */
+@RequiredArgsConstructor
 public class GetWalletUseCaseImpl implements GetWalletUseCase {
     private final WalletRepository walletRepository;
     private final YankiPaymentRepository paymentRepository;
     private final DebitCardLinkRepository linkRepository;
-
-    /**
-     * Crea el caso de uso con los adaptadores de sus puertos.
-     */
-    public GetWalletUseCaseImpl(
-            WalletRepository walletRepository,
-            YankiPaymentRepository paymentRepository,
-            DebitCardLinkRepository linkRepository) {
-        this.walletRepository = walletRepository;
-        this.paymentRepository = paymentRepository;
-        this.linkRepository = linkRepository;
-    }
 
     @Override
     public Single<Wallet> findWallet(String walletId) {

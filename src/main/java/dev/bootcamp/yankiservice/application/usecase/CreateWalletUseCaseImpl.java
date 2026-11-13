@@ -6,6 +6,7 @@ import dev.bootcamp.yankiservice.domain.exception.BusinessRuleException;
 import dev.bootcamp.yankiservice.domain.model.wallet.DocumentType;
 import dev.bootcamp.yankiservice.domain.model.wallet.Wallet;
 import io.reactivex.rxjava3.core.Single;
+import lombok.RequiredArgsConstructor;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -13,22 +14,11 @@ import java.time.LocalDate;
 /**
  * Implementación de {@link CreateWalletUseCase}.
  */
+@RequiredArgsConstructor
 public class CreateWalletUseCaseImpl implements CreateWalletUseCase {
     private final WalletRepository walletRepository;
     private final WalletEventPublisher walletEventPublisher;
     private final Clock clock;
-
-    /**
-     * Crea el caso de uso con sus puertos y el reloj que fija la fecha de alta.
-     */
-    public CreateWalletUseCaseImpl(
-            WalletRepository walletRepository,
-            WalletEventPublisher walletEventPublisher,
-            Clock clock) {
-        this.walletRepository = walletRepository;
-        this.walletEventPublisher = walletEventPublisher;
-        this.clock = clock;
-    }
 
     @Override
     public Single<Wallet> execute(
