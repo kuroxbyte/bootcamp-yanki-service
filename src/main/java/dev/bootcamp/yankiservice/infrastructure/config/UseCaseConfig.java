@@ -18,6 +18,8 @@ import dev.bootcamp.yankiservice.application.usecase.SaveDebitCardUseCase;
 import dev.bootcamp.yankiservice.application.usecase.SaveDebitCardUseCaseImpl;
 import dev.bootcamp.yankiservice.application.usecase.SendPaymentUseCase;
 import dev.bootcamp.yankiservice.application.usecase.SendPaymentUseCaseImpl;
+import dev.bootcamp.yankiservice.application.usecase.UpdateWalletUseCase;
+import dev.bootcamp.yankiservice.application.usecase.UpdateWalletUseCaseImpl;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -116,7 +118,23 @@ public class UseCaseConfig {
      * Registra el caso de uso {@link SaveDebitCardUseCase}.
      */
     @Bean
-    public SaveDebitCardUseCase saveDebitCardUseCase(DebitCardRepository debitCardRepository) {
-        return new SaveDebitCardUseCaseImpl(debitCardRepository);
+    public SaveDebitCardUseCase saveDebitCardUseCase(
+            DebitCardRepository debitCardRepository,
+            WalletRepository walletRepository) {
+        return new SaveDebitCardUseCaseImpl(debitCardRepository, walletRepository);
+    }
+
+    /**
+     * Registra el caso de uso {@link UpdateWalletUseCase}.
+     */
+    @Bean
+    public UpdateWalletUseCase updateWalletUseCase(
+            WalletRepository walletRepository,
+            YankiPaymentRepository paymentRepository,
+            WalletEventPublisher walletEventPublisher) {
+        return new UpdateWalletUseCaseImpl(
+                walletRepository,
+                paymentRepository,
+                walletEventPublisher);
     }
 }

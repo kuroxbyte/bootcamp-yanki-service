@@ -18,7 +18,7 @@ public interface GetWalletUseCase {
     /**
      * Consulta el monedero.
      *
-     * @return el monedero; error {@link NotFoundException} si no existe
+     * @return el monedero; error {@link NotFoundException} si no existe o fue dado de baja
      */
     Single<Wallet> findWallet(String walletId);
 

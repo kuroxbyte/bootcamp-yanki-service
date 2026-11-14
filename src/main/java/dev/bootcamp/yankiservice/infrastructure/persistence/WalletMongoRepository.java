@@ -58,4 +58,23 @@ public interface WalletMongoRepository extends ReactiveMongoRepository<WalletDoc
      */
     @Update("{ '$set': { 'status': 'ACTIVE' }, '$inc': { 'balance': ?1 } }")
     Mono<Long> findAndRestoreBalanceById(String id, Decimal128 balance);
+
+    /**
+     * Cambia el IMEI y el correo del monedero.
+     */
+    @Update("{ '$set': { 'imei': ?1, 'email': ?2 } }")
+    Mono<Long> findAndSetContactById(String id, String imei, String email);
+
+    /**
+     * Da de baja el monedero si sigue en {@code status} con el saldo {@code balance}; quita su
+     * tarjeta para liberarla.
+     */
+    @Update("{ '$set': { 'status': 'CLOSED' }, '$unset': { 'debitCardId': '' } }")
+    Mono<Long> findAndCloseByIdAndStatusAndBalance(String id, String status, Decimal128 balance);
+
+    /**
+     * Quita la tarjeta del monedero que la tenga.
+     */
+    @Update("{ '$unset': { 'debitCardId': '' } }")
+    Mono<Long> findAndUnsetDebitCardIdByDebitCardId(String debitCardId);
 }

@@ -100,4 +100,22 @@ class YankiKafkaPublishersTest {
         assertThat(event.get("eventType").asString()).isEqualTo("YankiAccountCreditRequested");
         assertThat(event.get("reversal").asBoolean()).isTrue();
     }
+
+    @Test
+    void publishesWalletClosed() {
+        WalletKafkaEventPublisher publisher =
+                new WalletKafkaEventPublisher(kafkaTemplate, jsonMapper, clock, "yanki-events");
+        Wallet wallet = new Wallet(
+                DocumentType.DNI, "12345678", "987654321", "490154203237518", "a@b.pe");
+        wallet.setId("w1");
+        when(kafkaTemplate.send(eq("yanki-events"), eq("w1"), anyString()))
+                .thenReturn(CompletableFuture.completedFuture(null));
+
+        publisher.publishWalletClosed(wallet).test().awaitDone(2, TimeUnit.SECONDS)
+                .assertComplete();
+
+        JsonNode event = sent("yanki-events", "w1");
+        assertThat(event.get("eventType").asString()).isEqualTo("WalletClosed");
+        assertThat(event.get("phone").asString()).isEqualTo("987654321");
+    }
 }

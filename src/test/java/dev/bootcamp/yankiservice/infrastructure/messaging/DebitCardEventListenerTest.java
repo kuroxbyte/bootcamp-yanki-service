@@ -4,6 +4,7 @@ import dev.bootcamp.yankiservice.application.usecase.SaveDebitCardUseCase;
 import dev.bootcamp.yankiservice.domain.model.debitcard.DebitCard;
 import io.reactivex.rxjava3.core.Completable;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -45,6 +46,17 @@ class DebitCardEventListenerTest {
     void ignoresUnknownEventTypes(String eventType) {
         listener.onDebitCardEvent("{\"eventType\":\"" + eventType + "\"}");
 
+        verify(saveDebitCardUseCase, never()).execute(any());
+    }
+
+    @Test
+    void releasesTheClosedCard() {
+        when(saveDebitCardUseCase.close("d1")).thenReturn(Completable.complete());
+
+        listener.onDebitCardEvent("{\"eventType\":\"DebitCardClosed\",\"debitCardId\":\"d1\","
+                + "\"customerId\":\"c1\",\"primaryAccountId\":\"a1\"}");
+
+        verify(saveDebitCardUseCase).close("d1");
         verify(saveDebitCardUseCase, never()).execute(any());
     }
 }

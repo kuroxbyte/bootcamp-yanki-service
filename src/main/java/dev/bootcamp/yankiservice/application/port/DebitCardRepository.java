@@ -20,4 +20,9 @@ public interface DebitCardRepository {
      * @return la tarjeta, o vacío si yanki-service todavía no la conoce
      */
     Maybe<DebitCard> findById(String debitCardId);
+
+    /**
+     * Quita la tarjeta de la copia local (y de la caché); no falla si no existe.
+     */
+    Completable deleteById(String debitCardId);
 }

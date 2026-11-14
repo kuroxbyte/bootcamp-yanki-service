@@ -158,4 +158,46 @@ class WalletPersistenceAdapterTest {
 
         assertThat(mongoRepository.count().block()).isEqualTo(2);
     }
+
+    @Test
+    void updatesContactWithoutTouchingTheBalance() {
+        Wallet wallet = saved("987654321", "40");
+
+        adapter.updateContact(wallet.getId(), "356938035643809", "nuevo@mail.com")
+                .blockingAwait();
+
+        Wallet reloaded = reload(wallet.getId());
+        assertThat(reloaded.getImei()).isEqualTo("356938035643809");
+        assertThat(reloaded.getEmail()).isEqualTo("nuevo@mail.com");
+        assertThat(reloaded.getBalance()).isEqualByComparingTo("40");
+    }
+
+    @Test
+    void closesOnlyWithTheExpectedBalanceAndFreesTheCard() {
+        Wallet wallet = saved("987654321", "0");
+        adapter.startLinking(wallet.getId()).blockingGet();
+        adapter.finishLinking(wallet.getId(), "d1").blockingAwait();
+
+        assertThat(adapter.close(wallet.getId(), BigDecimal.ONE).blockingGet()).isFalse();
+        assertThat(adapter.close(wallet.getId(), BigDecimal.ZERO).blockingGet()).isTrue();
+
+        Wallet closed = reload(wallet.getId());
+        assertThat(closed.isClosed()).isTrue();
+        assertThat(closed.getDebitCardId()).isNull();
+        adapter.existsByDebitCardId("d1").test().awaitDone(5, TimeUnit.SECONDS)
+                .assertValue(false);
+        assertThat(adapter.close(wallet.getId(), BigDecimal.ZERO).blockingGet()).isFalse();
+    }
+
+    @Test
+    void releasesTheCardOfTheWalletThatHasIt() {
+        Wallet wallet = saved("987654321", "0");
+        adapter.startLinking(wallet.getId()).blockingGet();
+        adapter.finishLinking(wallet.getId(), "d1").blockingAwait();
+
+        adapter.releaseDebitCard("d1").blockingAwait();
+        adapter.releaseDebitCard("d9").blockingAwait();
+
+        assertThat(reload(wallet.getId()).getDebitCardId()).isNull();
+    }
 }

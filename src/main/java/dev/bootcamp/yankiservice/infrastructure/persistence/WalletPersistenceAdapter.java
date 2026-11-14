@@ -105,6 +105,25 @@ public class WalletPersistenceAdapter implements WalletRepository {
                 mongoRepository.findAndRestoreBalanceById(walletId, new Decimal128(balance)));
     }
 
+    @Override
+    public Completable updateContact(String walletId, String imei, String email) {
+        return Completable.fromPublisher(
+                mongoRepository.findAndSetContactById(walletId, imei, email));
+    }
+
+    @Override
+    public Single<Boolean> close(String walletId, BigDecimal expectedBalance) {
+        return Single.fromPublisher(mongoRepository.findAndCloseByIdAndStatusAndBalance(
+                        walletId, ACTIVE, new Decimal128(expectedBalance)))
+                .map(modified -> modified == 1);
+    }
+
+    @Override
+    public Completable releaseDebitCard(String debitCardId) {
+        return Completable.fromPublisher(
+                mongoRepository.findAndUnsetDebitCardIdByDebitCardId(debitCardId));
+    }
+
     // Monedero activo y sin tarjeta: el único que usa su propio saldo.
     private static boolean isAvailable(WalletDocument document) {
         return ACTIVE.equals(document.getStatus()) && document.getDebitCardId() == null;

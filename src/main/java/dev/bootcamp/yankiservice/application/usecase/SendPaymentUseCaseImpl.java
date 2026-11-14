@@ -118,6 +118,7 @@ public class SendPaymentUseCaseImpl implements SendPaymentUseCase {
 
     private static Single<Wallet> activeWallet(Maybe<Wallet> wallet, RuntimeException notFound) {
         return wallet
+                .filter(found -> !found.isClosed())
                 .switchIfEmpty(Single.error(notFound))
                 .flatMap(found -> found.getStatus() == WalletStatus.ACTIVE
                         ? Single.just(found)

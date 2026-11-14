@@ -12,5 +12,9 @@ public enum WalletStatus {
      * Su saldo se está transfiriendo a la cuenta principal de la tarjeta que se le asocia; no
      * envía ni recibe pagos hasta que termine.
      */
-    LINKING
+    LINKING,
+    /**
+     * Dado de baja por su dueño: ya no envía ni recibe pagos ni aparece al buscarlo.
+     */
+    CLOSED
 }

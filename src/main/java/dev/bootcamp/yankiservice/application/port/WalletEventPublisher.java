@@ -14,4 +14,11 @@ public interface WalletEventPublisher {
      * @return termina cuando se publicó, o sin error si no se pudo (el adaptador lo registra)
      */
     Completable publishWalletCreated(Wallet wallet);
+
+    /**
+     * Publica que se dio de baja un monedero.
+     *
+     * @return termina cuando se publicó, o sin error si no se pudo (el adaptador lo registra)
+     */
+    Completable publishWalletClosed(Wallet wallet);
 }

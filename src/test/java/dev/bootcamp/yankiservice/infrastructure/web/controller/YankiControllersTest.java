@@ -4,6 +4,7 @@ import dev.bootcamp.yankiservice.application.usecase.CreateWalletUseCase;
 import dev.bootcamp.yankiservice.application.usecase.GetWalletUseCase;
 import dev.bootcamp.yankiservice.application.usecase.LinkDebitCardUseCase;
 import dev.bootcamp.yankiservice.application.usecase.SendPaymentUseCase;
+import dev.bootcamp.yankiservice.application.usecase.UpdateWalletUseCase;
 import dev.bootcamp.yankiservice.domain.exception.BusinessRuleException;
 import dev.bootcamp.yankiservice.domain.exception.NotFoundException;
 import dev.bootcamp.yankiservice.domain.exception.OperationUnavailableException;
@@ -12,6 +13,7 @@ import dev.bootcamp.yankiservice.domain.model.link.LinkStatus;
 import dev.bootcamp.yankiservice.domain.model.payment.YankiPayment;
 import dev.bootcamp.yankiservice.domain.model.wallet.DocumentType;
 import dev.bootcamp.yankiservice.domain.model.wallet.Wallet;
+import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.Single;
 import org.junit.jupiter.api.Test;
@@ -47,6 +49,8 @@ class YankiControllersTest {
     @MockitoBean private CreateWalletUseCase createWalletUseCase;
 
     @MockitoBean private GetWalletUseCase getWalletUseCase;
+
+    @MockitoBean private UpdateWalletUseCase updateWalletUseCase;
 
     @MockitoBean private SendPaymentUseCase sendPaymentUseCase;
 
@@ -213,5 +217,31 @@ class YankiControllersTest {
                 .expectStatus().isOk();
         post("/api/v1/yanki/debit-card-links/l1/confirm", "X-Wallet-Id", "w1", "{}")
                 .expectStatus().isAccepted();
+    }
+
+    @Test
+    void updatesContactOfOwnWallet() {
+        when(updateWalletUseCase.update("w1", "356938035643809", "nuevo@mail.com"))
+                .thenReturn(Single.just(wallet()));
+
+        webTestClient.put().uri("/api/v1/yanki/wallet")
+                .header("X-Wallet-Id", "w1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"imei\":\"356938035643809\",\"email\":\"nuevo@mail.com\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody().jsonPath("$.id").isEqualTo("w1");
+    }
+
+    @Test
+    void closesOwnWalletOrExplainsWhyNot() {
+        when(updateWalletUseCase.close("w1")).thenReturn(Completable.complete());
+        when(updateWalletUseCase.close("w2"))
+                .thenReturn(Completable.error(new BusinessRuleException("Tiene saldo")));
+
+        webTestClient.delete().uri("/api/v1/yanki/wallet").header("X-Wallet-Id", "w1")
+                .exchange().expectStatus().isNoContent();
+        webTestClient.delete().uri("/api/v1/yanki/wallet").header("X-Wallet-Id", "w2")
+                .exchange().expectStatus().isEqualTo(422);
     }
 }

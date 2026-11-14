@@ -63,4 +63,22 @@ public interface WalletRepository {
      * Cancela la asociación: devuelve el saldo al monedero y lo vuelve a activar sin tarjeta.
      */
     Completable cancelLinking(String walletId, BigDecimal balance);
+
+    /**
+     * Cambia el IMEI y el correo del monedero sin tocar su saldo.
+     */
+    Completable updateContact(String walletId, String imei, String email);
+
+    /**
+     * Da de baja el monedero si sigue activo y con el saldo indicado; libera su tarjeta.
+     *
+     * @return true si se dio de baja; false si un pago o una asociación lo cambió antes
+     */
+    Single<Boolean> close(String walletId, BigDecimal expectedBalance);
+
+    /**
+     * Quita la tarjeta del monedero que la tenga (la tarjeta fue dada de baja); el monedero
+     * vuelve a usar su propio saldo, que es 0.
+     */
+    Completable releaseDebitCard(String debitCardId);
 }
