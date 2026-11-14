@@ -22,11 +22,12 @@ import java.util.stream.StreamSupport;
 /**
  * Pone los índices de MongoDB al día con las anotaciones {@code @Indexed} de los documentos.
  *
- * <p>La creación automática de índices no modifica un índice que ya existe con otras opciones
- * (por ejemplo, el índice único de {@code wallets.phone}, que ahora es disperso): MongoDB rechaza
- * crearlo y el índice viejo sigue vigente. Al arrancar, este componente compara cada índice
- * declarado con el existente del mismo nombre; si difieren en {@code unique} o {@code sparse},
- * borra el viejo y crea el nuevo. Los índices que faltan se crean.
+ * <p>En este servicio es la única que crea los índices: la creación automática de Spring está
+ * desactivada en config-repo porque no modifica un índice que ya existe con otras opciones (por
+ * ejemplo, el índice único de {@code wallets.phone}, que ahora es disperso) y registraría un error.
+ * Al arrancar, compara cada índice declarado con el existente del mismo nombre; si difieren en
+ * {@code unique} o {@code sparse}, borra el viejo y crea el nuevo. Los índices que faltan se
+ * crean.
  *
  * <p>Corre en segundo plano y nunca impide el arranque: un error se registra.
  */
