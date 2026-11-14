@@ -55,6 +55,48 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Wallets]
+      operationId: updateWallet
+      summary: Modificar los datos de contacto del monedero propio
+      description: Cambia el IMEI (por ejemplo, al cambiar de celular) y el correo. El documento y el número de celular no cambian.
+      parameters:
+        - $ref: '#/components/parameters/XWalletId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WalletUpdateRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/WalletResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/BusinessRuleViolation'
+    delete:
+      tags: [Wallets]
+      operationId: deleteWallet
+      summary: Dar de baja el monedero propio
+      description: >-
+        Baja lógica: el monedero queda en estado CLOSED, ya no envía ni recibe pagos y su tarjeta de
+        débito queda libre. Solo si está activo, sin pagos pendientes y, si usa su propio saldo, con
+        saldo 0. Publica WalletClosed y auth-service elimina su acceso. El celular no se puede usar
+        para otro monedero.
+      parameters:
+        - $ref: '#/components/parameters/XWalletId'
+      responses:
+        '204':
+          description: Monedero dado de baja
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/BusinessRuleViolation'
   /api/v1/yanki/payments:
     post:
       tags: [Payments]
@@ -234,6 +276,17 @@ components:
         email:
           type: string
           example: ana@mail.com
+    WalletUpdateRequest:
+      type: object
+      required: [imei, email]
+      properties:
+        imei:
+          type: string
+          description: 15 dígitos con dígito de control válido
+          example: '356938035643809'
+        email:
+          type: string
+          example: nuevo.correo@mail.com
     WalletResponse:
       type: object
       properties:
@@ -258,7 +311,7 @@ components:
           description: Tarjeta de débito asociada (null si no tiene)
         status:
           type: string
-          enum: [ACTIVE, LINKING]
+          enum: [ACTIVE, LINKING, CLOSED]
         createdAt:
           type: string
           format: date

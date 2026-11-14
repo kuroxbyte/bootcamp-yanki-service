@@ -23,6 +23,7 @@ public class GetWalletUseCaseImpl implements GetWalletUseCase {
     @Override
     public Single<Wallet> findWallet(String walletId) {
         return walletRepository.findById(walletId)
+                .filter(wallet -> !wallet.isClosed())
                 .switchIfEmpty(Single.error(() -> new NotFoundException("El monedero no existe")));
     }
 

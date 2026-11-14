@@ -72,6 +72,17 @@ public class CachedDebitCardRepository implements DebitCardRepository {
         return Maybe.fromPublisher(cached(debitCardId).switchIfEmpty(fromDatabase));
     }
 
+    @Override
+    public Completable deleteById(String debitCardId) {
+        Mono<Void> evict = redisTemplate.delete(KEY_PREFIX + debitCardId)
+                .then()
+                .onErrorResume(error -> {
+                    log.warn("Redis delete failed debitCardId={}", debitCardId, error);
+                    return Mono.empty();
+                });
+        return Completable.fromPublisher(mongoRepository.deleteById(debitCardId).then(evict));
+    }
+
     private Mono<DebitCard> cached(String debitCardId) {
         return redisTemplate.opsForValue()
                 .get(KEY_PREFIX + debitCardId)

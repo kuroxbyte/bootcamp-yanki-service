@@ -74,6 +74,48 @@ public class Wallet {
         return debitCardId != null;
     }
 
+    /**
+     * Indica si el monedero fue dado de baja.
+     */
+    public boolean isClosed() {
+        return status == WalletStatus.CLOSED;
+    }
+
+    /**
+     * Valida los nuevos datos de contacto del monedero: el IMEI de otro celular y el correo. El
+     * documento y el celular no cambian (el celular identifica al monedero).
+     *
+     * @return un monedero con los nuevos datos y el mismo id, saldo, tarjeta y estado
+     * @throws BusinessRuleException si el IMEI o el correo no son válidos
+     */
+    public Wallet withContact(String newImei, String newEmail) {
+        Wallet updated = new Wallet(documentType, documentNumber, phone, newImei, newEmail);
+        updated.setId(id);
+        updated.setBalance(balance);
+        updated.setDebitCardId(debitCardId);
+        updated.setStatus(status);
+        updated.setCreatedAt(createdAt);
+        return updated;
+    }
+
+    /**
+     * Verifica que el monedero se pueda dar de baja: debe estar activo (no asociando una tarjeta)
+     * y, si usa su propio saldo, tenerlo en 0. Con tarjeta, el dinero está en la cuenta y la
+     * tarjeta queda libre.
+     *
+     * @throws BusinessRuleException si no se puede dar de baja
+     */
+    public void validateClosing() {
+        if (status != WalletStatus.ACTIVE) {
+            throw new BusinessRuleException(
+                    "El monedero está asociando una tarjeta; intente en unos segundos");
+        }
+        if (!hasDebitCard() && balance.signum() != 0) {
+            throw new BusinessRuleException("El monedero tiene saldo "
+                    + balance.toPlainString() + "; debe quedar en 0 para darlo de baja");
+        }
+    }
+
     // Dígito de control de Luhn, el que usa el IMEI.
     private static boolean luhn(String digits) {
         int sum = 0;

@@ -21,15 +21,16 @@ import java.util.UUID;
  * la clave del mensaje es el id del monedero. El contrato está en {@code docs/events/asyncapi.yaml}
  * del repositorio raíz.
  *
- * <p>Si Kafka no responde ({@code max.block.ms}, 1 s en config-repo), el error se registra y la
- * creación del monedero no falla: el evento se pierde (limitación conocida; evitarla requiere el
- * patrón outbox).
+ * <p>Publica {@code WalletCreated} y {@code WalletClosed}. Si Kafka no responde
+ * ({@code max.block.ms}, 1 s en config-repo), el error se registra y la operación no falla: el
+ * evento se pierde (limitación conocida; evitarla requiere el patrón outbox).
  */
 @Slf4j
 @Component
 public class WalletKafkaEventPublisher implements WalletEventPublisher {
 
     static final String WALLET_CREATED = "WalletCreated";
+    static final String WALLET_CLOSED = "WalletClosed";
 
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final JsonMapper jsonMapper;
@@ -52,9 +53,18 @@ public class WalletKafkaEventPublisher implements WalletEventPublisher {
 
     @Override
     public Completable publishWalletCreated(Wallet wallet) {
+        return publish(WALLET_CREATED, wallet);
+    }
+
+    @Override
+    public Completable publishWalletClosed(Wallet wallet) {
+        return publish(WALLET_CLOSED, wallet);
+    }
+
+    private Completable publish(String eventType, Wallet wallet) {
         return Completable.defer(() -> {
             Map<String, Object> event = new LinkedHashMap<>();
-            event.put("eventType", WALLET_CREATED);
+            event.put("eventType", eventType);
             event.put("eventId", UUID.randomUUID().toString());
             event.put("walletId", wallet.getId());
             event.put("phone", wallet.getPhone());
@@ -66,10 +76,12 @@ public class WalletKafkaEventPublisher implements WalletEventPublisher {
         })
                 // send() puede bloquear mientras busca al broker: fuera del hilo de eventos.
                 .subscribeOn(Schedulers.io())
-                .doOnComplete(() -> log.info("WalletCreated published walletId={}", wallet.getId()))
+                .doOnComplete(() -> log.info(
+                        "{} published walletId={}", eventType, wallet.getId()))
                 .onErrorComplete(error -> {
                     log.error(
-                            "WalletCreated could not be published walletId={}",
+                            "{} could not be published walletId={}",
+                            eventType,
                             wallet.getId(),
                             error);
                     return true;

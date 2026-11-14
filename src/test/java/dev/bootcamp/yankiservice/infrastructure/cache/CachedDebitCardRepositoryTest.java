@@ -14,10 +14,12 @@ import reactor.core.publisher.Mono;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,7 +42,8 @@ class CachedDebitCardRepositoryTest {
 
     @BeforeEach
     void createRepository() {
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        // La prueba de borrado no usa opsForValue().
+        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         repository = new CachedDebitCardRepository(
                 mongoRepository,
                 redisTemplate,
@@ -79,5 +82,16 @@ class CachedDebitCardRepositoryTest {
                 .thenReturn(Mono.error(new IllegalStateException("redis down")));
 
         repository.findById("d1").test().assertValue(CARD);
+    }
+
+    @Test
+    void deletesFromMongoAndEvictsTheCacheEvenIfRedisFails() {
+        when(mongoRepository.deleteById("d1")).thenReturn(Mono.empty());
+        when(redisTemplate.delete("debit-card:d1"))
+                .thenReturn(Mono.error(new IllegalStateException("redis down")));
+
+        repository.deleteById("d1").test().awaitDone(1, TimeUnit.SECONDS).assertComplete();
+
+        verify(mongoRepository).deleteById("d1");
     }
 }
