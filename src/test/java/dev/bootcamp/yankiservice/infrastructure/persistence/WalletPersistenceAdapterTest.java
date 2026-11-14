@@ -173,20 +173,69 @@ class WalletPersistenceAdapterTest {
     }
 
     @Test
-    void closesOnlyWithTheExpectedBalanceAndFreesTheCard() {
+    void closesOnlyWithTheExpectedBalanceAndFreesTheCardAndThePhone() {
+        when(phoneCache.evict("987654321")).thenReturn(Mono.empty());
         Wallet wallet = saved("987654321", "0");
         adapter.startLinking(wallet.getId()).blockingGet();
         adapter.finishLinking(wallet.getId(), "d1").blockingAwait();
+        Wallet linked = reload(wallet.getId());
 
-        assertThat(adapter.close(wallet.getId(), BigDecimal.ONE).blockingGet()).isFalse();
-        assertThat(adapter.close(wallet.getId(), BigDecimal.ZERO).blockingGet()).isTrue();
+        linked.setBalance(BigDecimal.ONE);
+        assertThat(adapter.close(linked).blockingGet()).isFalse();
+        linked.setBalance(BigDecimal.ZERO);
+        assertThat(adapter.close(linked).blockingGet()).isTrue();
 
         Wallet closed = reload(wallet.getId());
         assertThat(closed.isClosed()).isTrue();
         assertThat(closed.getDebitCardId()).isNull();
+        // El monedero dado de baja conserva su celular, pero ya no lo ocupa.
+        assertThat(closed.getPhone()).isEqualTo("987654321");
         adapter.existsByDebitCardId("d1").test().awaitDone(5, TimeUnit.SECONDS)
                 .assertValue(false);
-        assertThat(adapter.close(wallet.getId(), BigDecimal.ZERO).blockingGet()).isFalse();
+        adapter.findByPhone("987654321").test().awaitDone(5, TimeUnit.SECONDS).assertNoValues();
+        verify(phoneCache).evict("987654321");
+        assertThat(adapter.close(linked).blockingGet()).isFalse();
+    }
+
+    @Test
+    void phoneOfClosedWalletCanBeUsedByNewWallet() {
+        when(phoneCache.evict(anyString())).thenReturn(Mono.empty());
+        Wallet old = saved("987654321", "0");
+        adapter.close(old).blockingGet();
+        // Otro monedero sin celular (dado de baja) no choca con el índice disperso.
+        Wallet other = saved("912345678", "0");
+        adapter.close(other).test().awaitDone(5, TimeUnit.SECONDS).assertNoErrors();
+
+        Wallet reused = saved("987654321", "0");
+
+        assertThat(reused.getId()).isNotEqualTo(old.getId());
+        adapter.findByPhone("987654321").test().awaitDone(5, TimeUnit.SECONDS)
+                .assertValue(found -> found.getId().equals(reused.getId()));
+    }
+
+    @Test
+    void cachedIdOfClosedWalletIsIgnored() {
+        when(phoneCache.evict("987654321")).thenReturn(Mono.empty());
+        Wallet old = saved("987654321", "0");
+        adapter.close(old).blockingGet();
+        Wallet reused = saved("987654321", "0");
+        // La caché todavía apunta al monedero dado de baja.
+        when(phoneCache.walletId("987654321")).thenReturn(Mono.just(old.getId()));
+
+        adapter.findByPhone("987654321").test().awaitDone(5, TimeUnit.SECONDS)
+                .assertValue(found -> found.getId().equals(reused.getId()));
+    }
+
+    @Test
+    void savingClosedWalletKeepsThePhoneAside() {
+        Wallet wallet = new Wallet(DocumentType.DNI, "12345678", "987654321", IMEI, "a@b.pe");
+        wallet.setStatus(WalletStatus.CLOSED);
+        wallet.setCreatedAt(LocalDate.of(2026, 11, 15));
+
+        Wallet saved = adapter.save(wallet).blockingGet();
+
+        assertThat(saved.getPhone()).isEqualTo("987654321");
+        adapter.findByPhone("987654321").test().awaitDone(5, TimeUnit.SECONDS).assertNoValues();
     }
 
     @Test

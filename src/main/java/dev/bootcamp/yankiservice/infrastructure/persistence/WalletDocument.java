@@ -14,9 +14,10 @@ import java.time.LocalDate;
 /**
  * Monedero tal como se guarda en la colección {@code wallets}.
  *
- * <p>Los índices únicos impiden dos monederos con el mismo celular y una tarjeta en dos monederos
- * aunque lleguen dos pedidos a la vez. El de la tarjeta es disperso: los monederos sin tarjeta no
- * tienen el campo.
+ * <p>Los índices únicos impiden dos monederos activos con el mismo celular y una tarjeta en dos
+ * monederos aunque lleguen dos pedidos a la vez. Ambos son dispersos: los monederos sin tarjeta no
+ * tienen {@code debitCardId}, y uno dado de baja guarda su celular en {@code closedPhone} y no
+ * tiene {@code phone}, así el celular queda libre para un monedero nuevo.
  */
 @Getter
 @AllArgsConstructor
@@ -25,7 +26,10 @@ public class WalletDocument {
     @Id private final String id;
     private final String documentType;
     private final String documentNumber;
-    @Indexed(unique = true) private final String phone;
+    /**
+     * Celular; null si el monedero fue dado de baja.
+     */
+    @Indexed(unique = true, sparse = true) private final String phone;
     private final String imei;
     private final String email;
 
@@ -38,9 +42,14 @@ public class WalletDocument {
     @Indexed(unique = true, sparse = true) private final String debitCardId;
 
     /**
-     * ACTIVE o LINKING.
+     * ACTIVE, LINKING o CLOSED.
      */
     private final String status;
 
     private final LocalDate createdAt;
+
+    /**
+     * Celular que tenía el monedero al darse de baja.
+     */
+    private final String closedPhone;
 }

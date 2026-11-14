@@ -53,8 +53,10 @@ public class WalletPersistenceAdapter implements WalletRepository {
         Mono<WalletDocument> fromDatabase = mongoRepository.findByPhone(phone)
                 .flatMap(document -> phoneCache.put(phone, document.getId())
                         .thenReturn(document));
+        // Si el monedero en caché ya no tiene ese celular (fue dado de baja), se busca en la base.
         Mono<WalletDocument> fromCache = phoneCache.walletId(phone)
-                .flatMap(mongoRepository::findById);
+                .flatMap(mongoRepository::findById)
+                .filter(document -> phone.equals(document.getPhone()));
         return Maybe.fromPublisher(fromCache.switchIfEmpty(fromDatabase))
                 .map(WalletPersistenceAdapter::toDomain);
     }
@@ -112,10 +114,15 @@ public class WalletPersistenceAdapter implements WalletRepository {
     }
 
     @Override
-    public Single<Boolean> close(String walletId, BigDecimal expectedBalance) {
-        return Single.fromPublisher(mongoRepository.findAndCloseByIdAndStatusAndBalance(
-                        walletId, ACTIVE, new Decimal128(expectedBalance)))
-                .map(modified -> modified == 1);
+    public Single<Boolean> close(Wallet wallet) {
+        Mono<Boolean> closed = mongoRepository.findAndCloseByIdAndStatusAndBalance(
+                        wallet.getId(), ACTIVE, new Decimal128(wallet.getBalance()))
+                .map(modified -> modified == 1)
+                // El celular queda libre: su entrada de caché ya no apunta a un monedero activo.
+                .flatMap(done -> done
+                        ? phoneCache.evict(wallet.getPhone()).thenReturn(true)
+                        : Mono.just(false));
+        return Single.fromPublisher(closed);
     }
 
     @Override
@@ -144,24 +151,26 @@ public class WalletPersistenceAdapter implements WalletRepository {
     }
 
     private static WalletDocument toDocument(Wallet wallet) {
+        boolean closed = wallet.isClosed();
         return new WalletDocument(
                 wallet.getId(),
                 wallet.getDocumentType().name(),
                 wallet.getDocumentNumber(),
-                wallet.getPhone(),
+                closed ? null : wallet.getPhone(),
                 wallet.getImei(),
                 wallet.getEmail(),
                 wallet.getBalance(),
                 wallet.getDebitCardId(),
                 wallet.getStatus().name(),
-                wallet.getCreatedAt());
+                wallet.getCreatedAt(),
+                closed ? wallet.getPhone() : null);
     }
 
     private static Wallet toDomain(WalletDocument document) {
         Wallet wallet = new Wallet(
                 DocumentType.valueOf(document.getDocumentType()),
                 document.getDocumentNumber(),
-                document.getPhone(),
+                document.getPhone() != null ? document.getPhone() : document.getClosedPhone(),
                 document.getImei(),
                 document.getEmail());
         wallet.setId(document.getId());
