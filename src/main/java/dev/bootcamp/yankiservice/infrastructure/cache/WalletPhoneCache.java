@@ -47,6 +47,18 @@ public class WalletPhoneCache {
     }
 
     /**
+     * Quita el celular de la caché (el monedero se dio de baja).
+     */
+    public Mono<Void> evict(String phone) {
+        return redisTemplate.delete(KEY_PREFIX + phone)
+                .then()
+                .onErrorResume(error -> {
+                    log.warn("Redis delete failed phone={}", phone, error);
+                    return Mono.empty();
+                });
+    }
+
+    /**
      * Guarda el id del monedero del celular.
      */
     public Mono<Void> put(String phone, String walletId) {

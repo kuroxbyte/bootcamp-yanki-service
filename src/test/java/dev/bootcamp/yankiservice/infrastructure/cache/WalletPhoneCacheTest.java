@@ -12,6 +12,7 @@ import reactor.test.StepVerifier;
 
 import java.time.Duration;
 
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,7 +28,8 @@ class WalletPhoneCacheTest {
 
     @BeforeEach
     void createCache() {
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        // La prueba de borrado no usa opsForValue().
+        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         cache = new WalletPhoneCache(redisTemplate, TTL);
     }
 
@@ -50,5 +52,14 @@ class WalletPhoneCacheTest {
 
         StepVerifier.create(cache.walletId("987654321")).verifyComplete();
         StepVerifier.create(cache.put("987654321", "w1")).verifyComplete();
+    }
+
+    @Test
+    void evictsThePhoneEvenIfRedisFails() {
+        when(redisTemplate.delete("wallet-phone:987654321"))
+                .thenReturn(Mono.just(1L), Mono.error(new IllegalStateException("redis down")));
+
+        StepVerifier.create(cache.evict("987654321")).verifyComplete();
+        StepVerifier.create(cache.evict("987654321")).verifyComplete();
     }
 }

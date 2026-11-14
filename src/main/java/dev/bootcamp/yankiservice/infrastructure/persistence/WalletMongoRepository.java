@@ -67,9 +67,10 @@ public interface WalletMongoRepository extends ReactiveMongoRepository<WalletDoc
 
     /**
      * Da de baja el monedero si sigue en {@code status} con el saldo {@code balance}; quita su
-     * tarjeta para liberarla.
+     * tarjeta y pasa su celular a {@code closedPhone} para liberarlos.
      */
-    @Update("{ '$set': { 'status': 'CLOSED' }, '$unset': { 'debitCardId': '' } }")
+    @Update("{ '$set': { 'status': 'CLOSED' }, '$unset': { 'debitCardId': '' },"
+            + " '$rename': { 'phone': 'closedPhone' } }")
     Mono<Long> findAndCloseByIdAndStatusAndBalance(String id, String status, Decimal128 balance);
 
     /**

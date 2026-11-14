@@ -43,7 +43,7 @@ public class UpdateWalletUseCaseImpl implements UpdateWalletUseCase {
                                                     + " segundos"))
                                     : Single.just(wallet));
                 })
-                .flatMap(wallet -> walletRepository.close(walletId, wallet.getBalance())
+                .flatMap(wallet -> walletRepository.close(wallet)
                         .flatMap(closed -> closed
                                 ? Single.just(wallet)
                                 : Single.<Wallet>error(new BusinessRuleException(

@@ -24,8 +24,8 @@ public interface UpdateWalletUseCase {
 
     /**
      * Da de baja el monedero (baja lógica, estado {@code CLOSED}). Solo si está activo, sin pagos
-     * pendientes y, si usa su propio saldo, con saldo 0. Libera su tarjeta de débito y publica
-     * {@code WalletClosed} para que auth-service elimine su acceso.
+     * pendientes y, si usa su propio saldo, con saldo 0. Libera su tarjeta de débito y su
+     * celular, y publica {@code WalletClosed} para que auth-service elimine su acceso.
      *
      * @return termina sin error si se dio de baja; error {@link NotFoundException} si no existe o
      *     ya fue dado de baja, o {@link BusinessRuleException} si no se puede

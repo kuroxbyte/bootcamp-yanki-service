@@ -70,11 +70,12 @@ public interface WalletRepository {
     Completable updateContact(String walletId, String imei, String email);
 
     /**
-     * Da de baja el monedero si sigue activo y con el saldo indicado; libera su tarjeta.
+     * Da de baja el monedero si sigue activo y con el saldo leído en {@code wallet}; libera su
+     * tarjeta y su celular (que puede usarse para un monedero nuevo).
      *
      * @return true si se dio de baja; false si un pago o una asociación lo cambió antes
      */
-    Single<Boolean> close(String walletId, BigDecimal expectedBalance);
+    Single<Boolean> close(Wallet wallet);
 
     /**
      * Quita la tarjeta del monedero que la tenga (la tarjeta fue dada de baja); el monedero

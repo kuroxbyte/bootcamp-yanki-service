@@ -80,7 +80,7 @@ class UpdateWalletUseCaseImplTest {
     void closesWalletAndPublishesIt() {
         when(walletRepository.findById("w1")).thenReturn(Maybe.just(wallet()));
         when(paymentRepository.findByWalletId("w1")).thenReturn(Flowable.empty());
-        when(walletRepository.close("w1", BigDecimal.ZERO)).thenReturn(Single.just(true));
+        when(walletRepository.close(any())).thenReturn(Single.just(true));
         when(walletEventPublisher.publishWalletClosed(any())).thenReturn(Completable.complete());
 
         useCase().close("w1").test().assertComplete();
@@ -93,7 +93,7 @@ class UpdateWalletUseCaseImplTest {
         when(walletRepository.findById("w1")).thenReturn(Maybe.just(wallet()));
         when(paymentRepository.findByWalletId("w1"))
                 .thenReturn(Flowable.just(pendingPayment()), Flowable.empty());
-        when(walletRepository.close("w1", BigDecimal.ZERO)).thenReturn(Single.just(false));
+        when(walletRepository.close(any())).thenReturn(Single.just(false));
 
         useCase().close("w1").test().assertError(BusinessRuleException.class);
         useCase().close("w1").test().assertError(BusinessRuleException.class);

@@ -84,8 +84,8 @@ paths:
       description: >-
         Baja lógica: el monedero queda en estado CLOSED, ya no envía ni recibe pagos y su tarjeta de
         débito queda libre. Solo si está activo, sin pagos pendientes y, si usa su propio saldo, con
-        saldo 0. Publica WalletClosed y auth-service elimina su acceso. El celular no se puede usar
-        para otro monedero.
+        saldo 0. Publica WalletClosed y auth-service elimina su acceso. El celular queda libre para
+        crear un monedero nuevo.
       parameters:
         - $ref: '#/components/parameters/XWalletId'
       responses:
